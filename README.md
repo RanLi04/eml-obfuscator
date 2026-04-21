@@ -5,6 +5,7 @@
 This repository contains the prototype implementation of **Operator Homogenization** using the Exp-Minus-Log (EML) operator. The tool transforms C expressions into pure EML trees, eliminating operator-type diversity for obfuscation purposes.
 
 **Paper:** *"Operator Homogenization via the Exp–Minus–Log (EML) Function: Increasing Analysis Costs through Representation Uniformity"*
+- **Transcendental approximations:** The current prototype uses abbreviated EML encodings for `sin` and `cos` to limit tree explosion. Full expansions are derived in Odrzywołek (2026) and can be substituted for production use.
 
 ## 📁 Repository Structure
 
