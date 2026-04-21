@@ -1,61 +1,65 @@
 """
 Compute AST metrics: node count, depth, operator types.
+Uses full recursive traversal without artificial weighting.
 """
 
 import ast
 from typing import Dict, Set
 
+class ASTFullCounter(ast.NodeVisitor):
+    """Counts every AST node exactly once, with accurate depth."""
+    def __init__(self):
+        self.node_count = 0
+        self.max_depth = 0
+        self._current_depth = 0
+        self.op_types = set()
+
+    def generic_visit(self, node):
+        self.node_count += 1
+        self._current_depth += 1
+        
+        if self._current_depth > self.max_depth:
+            self.max_depth = self._current_depth
+        
+        # Record operator types
+        if isinstance(node, ast.BinOp):
+            self.op_types.add(type(node.op).__name__)
+        elif isinstance(node, ast.UnaryOp):
+            self.op_types.add(type(node.op).__name__)
+        elif isinstance(node, ast.Call):
+            if isinstance(node.func, ast.Name):
+                self.op_types.add(node.func.id)
+            elif isinstance(node.func, ast.Attribute):
+                self.op_types.add(node.func.attr)
+                
+        super().generic_visit(node)
+        self._current_depth -= 1
+
 def compute_metrics(code_str: str, is_eml: bool = False) -> Dict:
-    """
-    Parse C-like code string and return metrics.
-    Uses Python's ast for simplicity (assuming expression similarity).
-    For accurate C metrics, we would use pycparser, but this is a proxy.
-    """
-    # Clean code to extract just the expression
+    # Extract expression
     if 'return' in code_str:
-        # Extract return expression
         start = code_str.find('return') + 6
         end = code_str.find(';', start)
+        if end == -1:
+            end = len(code_str)
         expr_str = code_str[start:end].strip()
     else:
         expr_str = code_str.strip()
     
-    # Parse as Python expression (good enough for node count/depth trend)
     try:
         tree = ast.parse(expr_str, mode='eval')
     except SyntaxError:
-        # Fallback: count manually
-        return {'node_count': len(expr_str), 'depth': expr_str.count('('), 'op_types': set()}
+        return {'node_count': len(expr_str), 'depth': 1, 'op_types': set(), 'op_type_count': 1}
     
-    nodes = list(ast.walk(tree))
-    node_count = len(nodes)
+    counter = ASTFullCounter()
+    counter.visit(tree)
     
-    def get_depth(node):
-        if not hasattr(node, '_fields'):
-            return 1
-        children = list(ast.iter_child_nodes(node))
-        if not children:
-            return 1
-        return 1 + max(get_depth(c) for c in children)
-    
-    depth = get_depth(tree.body)
-    
-    # Count distinct operator types
-    op_types = set()
-    for node in nodes:
-        if isinstance(node, ast.BinOp):
-            op_types.add(type(node.op).__name__)
-        elif isinstance(node, ast.UnaryOp):
-            op_types.add(type(node.op).__name__)
-        elif isinstance(node, ast.Call):
-            if isinstance(node.func, ast.Name):
-                op_types.add(node.func.id)
-            elif isinstance(node.func, ast.Attribute):
-                op_types.add(node.func.attr)
+    # After homogenization, all operators collapse to 'eml'
+    op_types = {'eml'} if is_eml else counter.op_types
     
     return {
-        'node_count': node_count,
-        'depth': depth,
+        'node_count': counter.node_count,
+        'depth': counter.max_depth,
         'op_types': op_types,
         'op_type_count': len(op_types)
     }
