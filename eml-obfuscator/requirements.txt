@@ -1,0 +1,5 @@
+pycparser>=2.21
+angr>=9.2.0
+yara-python>=4.2.0
+numpy>=1.21.0
+matplotlib>=3.4.0
